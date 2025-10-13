@@ -1,158 +1,23 @@
-mkdir modelagem
+usuarios (id PK) 
+│
+├──< atendimentos >──┤
+                     │
+                profissionais_especialidades
+                     │
+               especialidades (id PK)
+| Campo | Tipo         | Restrições |
+| ----- | ------------ | ---------- |
+| id    | SERIAL       | PK         |
+| nome  | VARCHAR(100) | NOT NULL   |
+| Campo            | Tipo | Restrições                  |
+| ---------------- | ---- | --------------------------- |
+| usuario_id       | UUID | PK, FK → usuarios(id)       |
+| especialidade_id | INT  | PK, FK → especialidades(id) |
+| Campo           | Tipo      | Restrições        |
+| --------------- | --------- | ----------------- |
+| id              | UUID      | PK                |
+| paciente_id     | UUID      | FK → usuarios(id) |
+| profissional_id | UUID      | FK → usuarios(id) |
+| data_hora       | TIMESTAMP | NOT NULL          |
+| descricao       | TEXT      | NULLABLE          |
 
-Campo 
-
-Tipo 
-
-Restrições 
-
-Descrição 
-
-ID 
-
-INT 
-
-PK, Auto Increment 
-
-Identificador único da pessoa 
-
-Nome 
-
-VARCHAR(100) 
-
-NOT NULL 
-
-Nome completo da pessoa 
-
-Email 
-
-VARCHAR(150) 
-
-UNIQUE, NOT NULL 
-
-E-mail da pessoa 
-
-TipoPessoa 
-
-ENUM 
-
-NOT NULL, valores: 'cliente', 'funcionario' 
-
-Tipo de pessoa 
-
-Salario 
-
-DECIMAL(10,2) 
-
-NULL 
-
-Somente para funcionários 
-
-DataCadastro 
-
-DATE 
-
-NULL 
-
-Somente para clientes 
-
- 
-
-Proposta 2 
-
-️ Modelo DER (simplificado) 
-
-Pessoa 
-
------- 
-
-ID (PK) 
-
-Nome 
-
-Email 
-
-  
-
-Cliente 
-
-------- 
-
-ID (PK, FK → Pessoa.ID) 
-
-DataCadastro 
-
-  
-
-Funcionario 
-
------------ 
-
-ID (PK, FK → Pessoa.ID) 
-
-Salario 
-
-DICIONÁRIO DE DADOS 
-
-Campo 
-
-Tipo 
-
-Restrições 
-
-ID 
-
-INT 
-
-PK, Auto Increment 
-
-Nome 
-
-VARCHAR(100) 
-
-NOT NULL 
-
-Email 
-
-VARCHAR(150) 
-
-UNIQUE, NOT NULL 
-
-Campo 
-
-Tipo 
-
-Restrições 
-
-ID 
-
-INT 
-
-PK, FK → Pessoa.ID 
-
-DataCadastro 
-
-DATE 
-
-NOT NULL 
-
-Campo 
-
-Tipo 
-
-Restrições 
-
-ID 
-
-INT 
-
-PK, FK → Pessoa.ID 
-
-Salario 
-
-DECIMAL(10,2) 
-
-NOT NULL 
-
- # Dba-Modelagem-de-Dados
-Desafio Técnico
