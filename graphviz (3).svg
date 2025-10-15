@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1252pt" height="142pt" viewBox="0.00 0.00 1252.00 142.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 137.96)">
+<title>ERD_Proposta1</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-137.96 1248.23,-137.96 1248.23,4 -4,4"/>
+<!-- usuarios -->
+<g id="node1" class="node">
+<title>usuarios</title>
+<polygon fill="lightgray" stroke="black" points="0,-80.5 0,-116.5 610.92,-116.5 610.92,-80.5 0,-80.5"/>
+<text xml:space="preserve" text-anchor="middle" x="31.33" y="-94.4" font-family="Times,serif" font-size="14.00">usuarios</text>
+<polyline fill="none" stroke="black" points="62.66,-80.7 62.66,-116.5"/>
+<text xml:space="preserve" text-anchor="middle" x="336.79" y="-94.4" font-family="Times,serif" font-size="14.00">id (PK)\lnome\lemail (UNIQUE)\ltipo_usuario (ENUM)\lgenero\ldata_nascimento\lcriado_em</text>
+</g>
+<!-- prof_esp -->
+<g id="node3" class="node">
+<title>prof_esp</title>
+<polygon fill="lightgray" stroke="black" points="764.13,-26.5 764.13,-62.5 1226.94,-62.5 1226.94,-26.5 764.13,-26.5"/>
+<text xml:space="preserve" text-anchor="middle" x="851.83" y="-40.4" font-family="Times,serif" font-size="14.00">profissionais_especialidades</text>
+<polyline fill="none" stroke="black" points="939.53,-26.7 939.53,-62.5"/>
+<text xml:space="preserve" text-anchor="middle" x="1083.23" y="-40.4" font-family="Times,serif" font-size="14.00">usuario_id (PK, FK)\lespecialidade_id (PK, FK)</text>
+</g>
+<!-- usuarios&#45;&gt;prof_esp -->
+<g id="edge1" class="edge">
+<title>usuarios-&gt;prof_esp</title>
+<path fill="none" stroke="black" d="M541.81,-80.03C609.74,-74.7 683.96,-68.87 752.29,-63.51"/>
+<polygon fill="black" stroke="black" points="752.44,-67.01 762.14,-62.74 751.9,-60.03 752.44,-67.01"/>
+<text xml:space="preserve" text-anchor="middle" x="678.88" y="-77.32" font-family="Times,serif" font-size="14.00">1:N</text>
+</g>
+<!-- atendimentos -->
+<g id="node4" class="node">
+<title>atendimentos</title>
+<polygon fill="lightgray" stroke="black" points="746.84,-93.5 746.84,-129.5 1244.23,-129.5 1244.23,-93.5 746.84,-93.5"/>
+<text xml:space="preserve" text-anchor="middle" x="792.17" y="-107.4" font-family="Times,serif" font-size="14.00">atendimentos</text>
+<polyline fill="none" stroke="black" points="837.49,-93.7 837.49,-129.5"/>
+<text xml:space="preserve" text-anchor="middle" x="1040.86" y="-107.4" font-family="Times,serif" font-size="14.00">id (PK)\lpaciente_id (FK)\lprofissional_id (FK)\ldata_hora\ldescricao</text>
+</g>
+<!-- usuarios&#45;&gt;atendimentos -->
+<g id="edge3" class="edge">
+<title>usuarios-&gt;atendimentos</title>
+<path fill="none" stroke="black" d="M611.3,-97.86C650.85,-98.22 690.81,-98.8 728.84,-99.7 730.96,-99.75 733.08,-99.8 735.22,-99.86"/>
+<polygon fill="black" stroke="black" points="735.09,-103.35 745.18,-100.12 735.28,-96.36 735.09,-103.35"/>
+<text xml:space="preserve" text-anchor="middle" x="678.88" y="-103.9" font-family="Times,serif" font-size="14.00">1:N (paciente)</text>
+</g>
+<!-- usuarios&#45;&gt;atendimentos -->
+<g id="edge4" class="edge">
+<title>usuarios-&gt;atendimentos</title>
+<path fill="none" stroke="black" d="M611.1,-115.96C617.09,-116.15 623.03,-116.34 628.92,-116.5 673.31,-117.74 684.43,-116.92 728.84,-116.5 730.96,-116.48 733.08,-116.46 735.21,-116.44"/>
+<polygon fill="black" stroke="black" points="735.21,-119.94 745.17,-116.33 735.14,-112.94 735.21,-119.94"/>
+<text xml:space="preserve" text-anchor="middle" x="678.88" y="-121.36" font-family="Times,serif" font-size="14.00">1:N (profissional)</text>
+</g>
+<!-- especialidades -->
+<g id="node2" class="node">
+<title>especialidades</title>
+<polygon fill="lightgray" stroke="black" points="208.79,-0.5 208.79,-36.5 402.13,-36.5 402.13,-0.5 208.79,-0.5"/>
+<text xml:space="preserve" text-anchor="middle" x="257.21" y="-14.4" font-family="Times,serif" font-size="14.00">especialidades</text>
+<polyline fill="none" stroke="black" points="305.64,-0.7 305.64,-36.5"/>
+<text xml:space="preserve" text-anchor="middle" x="353.88" y="-14.4" font-family="Times,serif" font-size="14.00">id (PK)\lnome</text>
+</g>
+<!-- especialidades&#45;&gt;prof_esp -->
+<g id="edge2" class="edge">
+<title>especialidades-&gt;prof_esp</title>
+<path fill="none" stroke="black" d="M402.56,-16.31C488.21,-14.94 616.96,-14.33 728.84,-19.7 754.97,-20.95 782.5,-22.86 809.55,-25.07"/>
+<polygon fill="black" stroke="black" points="808.93,-28.53 819.18,-25.88 809.51,-21.56 808.93,-28.53"/>
+<text xml:space="preserve" text-anchor="middle" x="678.88" y="-23.9" font-family="Times,serif" font-size="14.00">1:N</text>
+</g>
+</g>
+</svg>
