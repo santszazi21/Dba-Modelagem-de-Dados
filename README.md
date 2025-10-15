@@ -125,7 +125,7 @@ Leve perda de performance: o acesso indireto (JOIN) pode ser marginalmente mais 
 Sobrecarga inicial: requer criação e manutenção de tabela, chaves e índices adicionais.
 
 
-Conclusão — Quando usar cada um
+Quando usar cada um
 
 Domínio pequeno, fixo e raramente alterado (ex.: “profissional/paciente”, “sexo”, “status ativo/inativo”)	ENUM	Melhor performance, simplicidade e integridade automática.
 Domínio sujeito a mudança ou expansão (ex.: “tipo de plano de saúde”, “especialidade médica”, “categoria de atendimento”)	Tabela de Domínio	Facilita manutenção e evita migrações de schema.
