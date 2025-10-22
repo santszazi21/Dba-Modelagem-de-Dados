@@ -1,0 +1,200 @@
+-- 1. ENUM types
+CREATE TYPE tipo_usuario_enum AS ENUM ('profissional','paciente','admin','outro');
+CREATE TYPE genero_enum AS ENUM (
+  'cisgênero','transgênero','não-binário','intersexo',
+  'agênero','outro','prefiro_não_dizer'
+);
+CREATE TYPE ativo_enum AS ENUM ('ativo','inativo');
+
+-- 2. Trigger helper: atualiza updated_at automaticamente
+CREATE OR REPLACE FUNCTION fn_update_timestamp()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 3. Tabela usuarios (dados públicos / administrativos)
+CREATE TABLE usuarios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome VARCHAR(100) NOT NULL,
+  email VARCHAR(100) NOT NULL UNIQUE,
+  tipo_usuario tipo_usuario_enum NOT NULL DEFAULT 'paciente',
+  genero genero_enum NULL,
+  data_nascimento DATE NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  created_by UUID NULL, -- FK opcional para auditoria (usuário que criou)
+  updated_by UUID NULL  -- FK opcional para auditoria
+);
+
+CREATE INDEX idx_usuarios_nome ON usuarios (nome);
+CREATE INDEX idx_usuarios_email ON usuarios (email);
+
+-- 4. Tabela profissionais (subclasse de usuario)
+CREATE TABLE profissionais (
+  usuario_id UUID PRIMARY KEY,
+  registro_profissional VARCHAR(30) NOT NULL,
+  ativo ativo_enum NOT NULL DEFAULT 'ativo',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_profissionais_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_profissionais_registro ON profissionais (registro_profissional);
+CREATE INDEX idx_profissionais_ativo ON profissionais (ativo);
+
+-- trigger para profissionais.updated_at
+CREATE TRIGGER trg_profissionais_update
+BEFORE UPDATE ON profissionais
+FOR EACH ROW EXECUTE FUNCTION fn_update_timestamp();
+
+-- 5. Tabela pacientes (subclasse)
+CREATE TABLE pacientes (
+  usuario_id UUID PRIMARY KEY,
+  prontuario JSONB NULL, -- dados dinâmicos não-sensiveis
+  dados_sensiveis_id UUID NULL, -- FK para tabela separada de dados altamente sensíveis (opcional)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pacientes_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+-- GIN index para consultas sobre o JSONB (buscas por chaves/valores)
+CREATE INDEX idx_pacientes_prontuario_gin ON pacientes USING GIN (prontuario);
+
+CREATE TRIGGER trg_pacientes_update
+BEFORE UPDATE ON pacientes
+FOR EACH ROW EXECUTE FUNCTION fn_update_timestamp();
+
+-- 6. (Opcional) tabela para dados sensíveis identificáveis (LGPD)
+-- armazenar separadamente, com controles de acesso (DB roles) e/ou criptografia em aplicação
+CREATE TABLE pacientes_dados_sensiveis (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  paciente_usuario_id UUID NOT NULL UNIQUE,
+  cpf TEXT NULL,
+  rg TEXT NULL,
+  endereco TEXT NULL,
+  telefone TEXT NULL,
+  cidade VARCHAR(100) NULL,
+  estado VARCHAR(50) NULL,
+  criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pdspaciente FOREIGN KEY (paciente_usuario_id) REFERENCES pacientes(usuario_id) ON DELETE CASCADE
+);
+
+-- 7. Especialidades
+CREATE TABLE especialidades (
+  id SERIAL PRIMARY KEY,
+  nome VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_especialidades_nome ON especialidades (nome);
+
+-- 8. Associação Profissional <-> Especialidade (N:N)
+CREATE TABLE profissionais_especialidades (
+  usuario_id UUID NOT NULL,
+  especialidade_id INT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (usuario_id, especialidade_id),
+  CONSTRAINT fk_prof_esp_usuario FOREIGN KEY (usuario_id) REFERENCES profissionais(usuario_id) ON DELETE CASCADE,
+  CONSTRAINT fk_prof_esp_especialidade FOREIGN KEY (especialidade_id) REFERENCES especialidades(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_prof_esp_especialidade_id ON profissionais_especialidades (especialidade_id);
+
+-- 9. Tabela de domínio: planos de saúde (escolha: TABELA DE DOMÍNIO)
+CREATE TABLE planos_saude (
+  id SERIAL PRIMARY KEY,
+  nome VARCHAR(150) NOT NULL,
+  operadora VARCHAR(150) NULL,
+  codigo_operadora VARCHAR(50) NULL,
+  ativo boolean NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uk_planos_codigo UNIQUE (codigo_operadora)
+);
+
+CREATE INDEX idx_planos_nome ON planos_saude (nome);
+
+-- 10. Associação Profissional <-> Plano (N:N com metadados)
+CREATE TABLE profissionais_planos (
+  usuario_id UUID NOT NULL,
+  plano_id INT NOT NULL,
+  cobertura TEXT NULL,              -- observação sobre cobertura / contrato
+  convenio_codigo VARCHAR(60) NULL,  -- código do convênio do profissional
+  ativo ativo_enum NOT NULL DEFAULT 'ativo',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (usuario_id, plano_id),
+  CONSTRAINT fk_prof_plan_usuario FOREIGN KEY (usuario_id) REFERENCES profissionais(usuario_id) ON DELETE CASCADE,
+  CONSTRAINT fk_prof_plan_plano FOREIGN KEY (plano_id) REFERENCES planos_saude(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_prof_plan_plano_id ON profissionais_planos (plano_id);
+CREATE INDEX idx_prof_plan_usuario_id ON profissionais_planos (usuario_id);
+
+-- 11. Atendimentos
+CREATE TABLE atendimentos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  paciente_id UUID NOT NULL,
+  profissional_id UUID NOT NULL,
+  data_hora TIMESTAMP WITH TIME ZONE NOT NULL,
+  descricao TEXT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  created_by UUID NULL,
+  updated_by UUID NULL,
+  CONSTRAINT fk_atendimento_paciente FOREIGN KEY (paciente_id) REFERENCES pacientes(usuario_id) ON DELETE CASCADE,
+  CONSTRAINT fk_atendimento_profissional FOREIGN KEY (profissional_id) REFERENCES profissionais(usuario_id) ON DELETE CASCADE,
+  CONSTRAINT uk_atendimento_profissional_data UNIQUE (profissional_id, data_hora),
+  CONSTRAINT ck_atendimento_prof_dif_pac CHECK (profissional_id <> paciente_id)
+  -- OBS: check para data futura depende da regra; ver comentário abaixo
+);
+
+-- trigger updated_at
+CREATE TRIGGER trg_atendimentos_update
+BEFORE UPDATE ON atendimentos
+FOR EACH ROW EXECUTE FUNCTION fn_update_timestamp();
+
+-- Índices para atendimentos
+CREATE INDEX idx_atendimentos_data_hora ON atendimentos (data_hora);
+CREATE INDEX idx_atendimentos_paciente_id ON atendimentos (paciente_id);
+CREATE INDEX idx_atendimentos_profissional_id ON atendimentos (profissional_id);
+
+-- 12. (Opcional) tabela de auditoria (operações sensíveis)
+CREATE TABLE auditoria_logs (
+  id BIGSERIAL PRIMARY KEY,
+  tabela_nome TEXT NOT NULL,
+  operacao CHAR(1) NOT NULL, -- I/U/D
+  registro_id TEXT NOT NULL,
+  usuario_id UUID NULL,
+  dados_antigos JSONB NULL,
+  dados_novos JSONB NULL,
+  criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_auditoria_tabela ON auditoria_logs (tabela_nome);
+
+-- 13. Exemplo inserts iniciais (dados de seed)
+INSERT INTO usuarios (nome, email, tipo_usuario, genero, data_nascimento)
+VALUES
+  ('Ana Souza', 'ana@exemplo.com', 'paciente', 'cisgênero', '1990-05-10'),
+  ('Carlos Lima', 'carlos@exemplo.com', 'profissional', 'transgênero', '1985-09-22');
+
+-- tornar Carlos profissional
+INSERT INTO profissionais (usuario_id, registro_profissional)
+SELECT id, 'CRM-123456' FROM usuarios WHERE email = 'carlos@exemplo.com';
+
+-- paciente Ana
+INSERT INTO pacientes (usuario_id, prontuario)
+SELECT id, '{"alergias": ["penicilina"], "historico":["asma leve"]}'::jsonb FROM usuarios WHERE email = 'ana@exemplo.com';
+
+-- planos, especialidades e vínculos
+INSERT INTO especialidades (nome) VALUES ('Clínica Geral'), ('Pediatria') ON CONFLICT DO NOTHING;
+INSERT INTO planos_saude (nome, operadora, codigo_operadora) VALUES ('Plano X', 'Operadora A', 'OP-A-X') ON CONFLICT DO NOTHING;
+
+-- vincular profissional a especialidade e plano (exemplo)
+INSERT INTO profissionais_especialidades (usuario_id, especialidade_id)
+SELECT p.usuario_id, e.id FROM profissionais p JOIN especialidades e ON e.nome='Clínica Geral' WHERE p.usuario_id IS NOT NULL
+ON CONFLICT DO NOTHING;
+
+INSERT INTO profissionais_planos (usuario_id, plano_id, convenio_codigo)
+SELECT p.usuario_id, pl.id, 'CONV-001' FROM profissionais p CROSS JOIN planos_saude pl WHERE pl.nome='Plano X'
+ON CONFLICT DO NOTHING;
