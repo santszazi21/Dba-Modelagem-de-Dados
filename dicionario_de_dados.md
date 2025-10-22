@@ -1,131 +1,159 @@
 
-# 🧾 DICIONÁRIO DE DADOS — Lacrei Saúde
+-- =========================================================
 
-> Arquivo SQL de referência: `scripts/01_create_tables.sql`  
-> Banco: **PostgreSQL 16+**
+-- PROJETO: Plataforma Lacrei Saúde
+-- BANCO: PostgreSQL 16+
+-- DESCRIÇÃO: Criação das tabelas e domínios conforme DER e dicionário de dados
+-- =========================================================
 
----
+-- =========================================================
+-- EXTENSÕES
+-- =========================================================
+CREATE EXTENSION IF NOT EXISTS "pgcrypto"; -- para gen_random_uuid()
 
-## **Tabela: usuarios**
-| Coluna | Tipo | Restrições | Descrição |
-|--------|------|-------------|------------|
-| id | `UUID` | `PRIMARY KEY (pk_usuarios_id)`, `DEFAULT gen_random_uuid()` | Identificador único do usuário |
-| nome | `VARCHAR(100)` | `NOT NULL` | Nome completo do usuário |
-| email | `VARCHAR(100)` | `NOT NULL`, `UNIQUE (uk_usuarios_email)` | E-mail único |
-| genero | `genero_enum` | `NULLABLE` | Identidade de gênero |
-| data_nascimento | `DATE` | `NULLABLE` | Data de nascimento |
-| criado_em | `TIMESTAMP` | `DEFAULT now()` | Data e hora de criação do registro |
+-- =========================================================
+-- ENUMS E DOMÍNIOS
+-- =========================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'genero_enum') THEN
+        CREATE TYPE genero_enum AS ENUM (
+            'cisgênero',
+            'transgênero',
+            'não-binário',
+            'intersexo',
+            'agênero',
+            'outro',
+            'prefiro_não_dizer'
+        );
+    END IF;
+END
+$$;
 
-**Índices:**
-- `idx_usuarios_nome` → (`nome`)
-- `idx_usuarios_email` → (`email`)
-
----
-
-## **Tabela: profissionais**
-| Coluna | Tipo | Restrições | Descrição |
-|--------|------|-------------|------------|
-| usuario_id | `UUID` | `PRIMARY KEY`, `FOREIGN KEY (fk_profissionais_usuario)` → `usuarios(id)` | Identificador do usuário vinculado |
-| registro_profissional | `VARCHAR(30)` | `NOT NULL` | Registro do conselho profissional (ex.: CRM, CRP) |
-
-**Índices:**
-- `idx_profissionais_registro` → (`registro_profissional`)
-
----
-
-## **Tabela: pacientes**
-| Coluna | Tipo | Restrições | Descrição |
-|--------|------|-------------|------------|
-| usuario_id | `UUID` | `PRIMARY KEY`, `FOREIGN KEY (fk_pacientes_usuario)` → `usuarios(id)` | Identificador do paciente vinculado |
-| prontuario | `JSONB` | `NULLABLE` | Informações médicas dinâmicas (ex.: alergias, histórico, etc.) |
-
-**Índices:**
-- `idx_pacientes_prontuario_gin` → `USING GIN(prontuario)`
-
----
-
-## **Tabela: especialidades**
-| Coluna | Tipo | Restrições | Descrição |
-|--------|------|-------------|------------|
-| id | `SERIAL` | `PRIMARY KEY (pk_especialidades_id)` | Identificador da especialidade |
-| nome | `VARCHAR(100)` | `NOT NULL` | Nome da especialidade médica |
-
----
-
-## **Tabela: profissionais_especialidades**
-| Coluna | Tipo | Restrições | Descrição |
-|--------|------|-------------|------------|
-| usuario_id | `UUID` | `FOREIGN KEY (fk_prof_esp_usuario)` → `profissionais(usuario_id)` | Profissional vinculado |
-| especialidade_id | `INT` | `FOREIGN KEY (fk_prof_esp_especialidade)` → `especialidades(id)` | Especialidade vinculada |
-
-**Chaves e Índices:**
-- `PRIMARY KEY (usuario_id, especialidade_id)` (`pk_prof_esp_composta`)
-- `idx_prof_esp_especialidade_id` → (`especialidade_id`)
-
----
-
-## **Tabela: atendimentos**
-| Coluna | Tipo | Restrições | Descrição |
-|--------|------|-------------|------------|
-| id | `UUID` | `PRIMARY KEY (pk_atendimentos_id)`, `DEFAULT gen_random_uuid()` | Identificador do atendimento |
-| paciente_id | `UUID` | `FOREIGN KEY (fk_atendimento_paciente)` → `pacientes(usuario_id)` | Paciente vinculado |
-| profissional_id | `UUID` | `FOREIGN KEY (fk_atendimento_profissional)` → `profissionais(usuario_id)` | Profissional responsável |
-| data_hora | `TIMESTAMP` | `NOT NULL`, `CHECK (data_hora >= now())` | Data e hora da consulta |
-| descricao | `TEXT` | `NULLABLE` | Observações sobre o atendimento |
-
-**Regras de negócio (constraints adicionais):**
-- `UNIQUE (profissional_id, data_hora)` (`uk_atendimento_profissional_data`) → evita double booking  
-- `CHECK (profissional_id <> paciente_id)` (`ck_atendimento_profissional_diferente_paciente`)  
-- `CHECK (data_hora >= now())` (`ck_atendimento_data_valida`)
-
-**Índices:**
-- `idx_atendimentos_data_hora` → (`data_hora`)
-
----
-
-## **Domínio: genero_enum**
-```sql
-CREATE TYPE genero_enum AS ENUM (
-  'cisgênero', 'transgênero', 'não-binário', 'intersexo',
-  'agênero', 'outro', 'prefiro_não_dizer'
+-- =========================================================
+-- TABELA: tipo_usuario
+-- =========================================================
+CREATE TABLE IF NOT EXISTS tipo_usuario (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(50) NOT NULL UNIQUE,
+    ativo BOOLEAN DEFAULT TRUE
 );
-```
 
----
+INSERT INTO tipo_usuario (nome)
+VALUES ('paciente'), ('profissional'), ('administrador')
+ON CONFLICT (nome) DO NOTHING;
 
-## **Exemplo de Inserts (dados iniciais)**
-```sql
-INSERT INTO usuarios (nome, email, genero) VALUES
-('Ana Souza', 'ana@exemplo.com', 'cisgênero'),
-('Carlos Lima', 'carlos@exemplo.com', 'transgênero');
+-- =========================================================
+-- TABELA: planos_saude
+-- =========================================================
+CREATE TABLE IF NOT EXISTS planos_saude (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE,
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT now(),
+    atualizado_em TIMESTAMP DEFAULT now()
+);
 
-INSERT INTO profissionais (usuario_id, registro_profissional)
-SELECT id, 'CRM-12345' FROM usuarios WHERE email = 'ana@exemplo.com';
+-- =========================================================
+-- TABELA: usuarios
+-- =========================================================
+CREATE TABLE IF NOT EXISTS usuarios (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    tipo_usuario_id INT REFERENCES tipo_usuario(id),
+    genero genero_enum,
+    data_nascimento DATE,
+    criado_em TIMESTAMP DEFAULT now(),
+    atualizado_em TIMESTAMP DEFAULT now(),
+    criado_por UUID NULL
+);
 
-INSERT INTO pacientes (usuario_id, prontuario)
-SELECT id, '{"alergias": ["penicilina"], "historico": ["asma leve"]}'::jsonb
-FROM usuarios WHERE email = 'carlos@exemplo.com';
+CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios (email);
+CREATE INDEX IF NOT EXISTS idx_usuarios_nome ON usuarios (nome);
 
-INSERT INTO especialidades (nome) VALUES ('Clínica Geral'), ('Pediatria');
+-- =========================================================
+-- TABELA: pacientes
+-- =========================================================
+CREATE TABLE IF NOT EXISTS pacientes (
+    usuario_id UUID PRIMARY KEY REFERENCES usuarios(id),
+    plano_saude_id INT REFERENCES planos_saude(id),
+    prontuario JSONB,
+    ativo BOOLEAN DEFAULT TRUE
+);
 
-INSERT INTO profissionais_especialidades (usuario_id, especialidade_id)
-SELECT p.usuario_id, e.id FROM profissionais p, especialidades e WHERE e.nome = 'Clínica Geral';
+CREATE INDEX IF NOT EXISTS idx_pacientes_prontuario_gin ON pacientes USING GIN (prontuario);
+CREATE INDEX IF NOT EXISTS idx_pacientes_plano_saude_id ON pacientes (plano_saude_id);
 
-INSERT INTO atendimentos (paciente_id, profissional_id, data_hora, descricao)
-SELECT 
-  (SELECT usuario_id FROM pacientes),
-  (SELECT usuario_id FROM profissionais),
-  NOW() + INTERVAL '1 day',
-  'Consulta de rotina';
-```
+-- =========================================================
+-- TABELA: profissionais
+-- =========================================================
+CREATE TABLE IF NOT EXISTS profissionais (
+    usuario_id UUID PRIMARY KEY REFERENCES usuarios(id),
+    registro_profissional VARCHAR(30) NOT NULL UNIQUE,
+    ativo BOOLEAN DEFAULT TRUE
+);
 
----
+CREATE INDEX IF NOT EXISTS idx_profissionais_registro ON profissionais (registro_profissional);
 
-## **Resumo Técnico**
-| Categoria | Implementação |
-|------------|----------------|
-| Banco | PostgreSQL |
-| PKs e FKs | Nomeadas e indexadas |
-| Índices adicionais | Criados para busca e performance |
-| Campos dinâmicos | `JSONB` com índice GIN |
-| Regras de integridade | `CHECK`, `UNIQUE`, `NOT NULL`, `FK`, `<>` |
+-- =========================================================
+-- TABELA: especialidades
+-- =========================================================
+CREATE TABLE IF NOT EXISTS especialidades (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE,
+    ativo BOOLEAN DEFAULT TRUE
+);
+
+-- =========================================================
+-- TABELA: profissionais_especialidades (N:N)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS profissionais_especialidades (
+    usuario_id UUID REFERENCES profissionais(usuario_id),
+    especialidade_id INT REFERENCES especialidades(id),
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT now(),
+    PRIMARY KEY (usuario_id, especialidade_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_prof_esp_especialidade_id ON profissionais_especialidades (especialidade_id);
+
+-- =========================================================
+-- TABELA: profissionais_planos (N:N)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS profissionais_planos (
+    usuario_id UUID REFERENCES profissionais(usuario_id),
+    plano_saude_id INT REFERENCES planos_saude(id),
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT now(),
+    PRIMARY KEY (usuario_id, plano_saude_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_prof_plan_plano_id ON profissionais_planos (plano_saude_id);
+
+-- =========================================================
+-- TABELA: atendimentos
+-- =========================================================
+CREATE TABLE IF NOT EXISTS atendimentos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    paciente_id UUID NOT NULL REFERENCES pacientes(usuario_id),
+    profissional_id UUID NOT NULL REFERENCES profissionais(usuario_id),
+    data_hora TIMESTAMP NOT NULL CHECK (data_hora >= now()),
+    descricao TEXT,
+    criado_em TIMESTAMP DEFAULT now(),
+    atualizado_em TIMESTAMP DEFAULT now(),
+    ativo BOOLEAN DEFAULT TRUE,
+    CONSTRAINT uk_atendimento_unico UNIQUE (profissional_id, data_hora),
+    CONSTRAINT chk_prof_paciente_diferentes CHECK (profissional_id <> paciente_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_atendimentos_data_hora ON atendimentos (data_hora);
+CREATE INDEX IF NOT EXISTS idx_atendimentos_profissional_id ON atendimentos (profissional_id);
+CREATE INDEX IF NOT EXISTS idx_atendimentos_paciente_id ON atendimentos (paciente_id);
+
+-- =========================================================
+-- FINALIZAÇÃO
+-- =========================================================
+COMMENT ON DATABASE current_database() IS 'Banco de dados Lacrei Saúde — Versão de Modelagem Completa';
+COMMENT ON SCHEMA public IS 'Schema principal da aplicação Lacrei Saúde';
+
